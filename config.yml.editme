@@ -1,0 +1,56 @@
+name: 'foobar'
+redis:
+  server: 'localhost'
+  port: 6379
+compare:
+  source: './archives'
+  destination: './fabs'
+  extension: '.jpg'
+interval: '30s'
+logfile:
+  error: 'error.log'
+  info: 'service.log'
+queue:
+  sync: 'pes-sync'
+  index: 'pes-index'
+  thumbnail: 'pes-thumbnail'
+source:
+  location : ''
+  size :
+    height: 1600
+    width: 1600
+thumbnails:
+  destination: './thumbnails/{{l1}}/{{l2}}/{{filename}}.{{profile}}.jpg'
+  force: false
+  watermark:
+    cache: './.watermarkCache'
+    image: './img/HSA-Watermark-OP60-White-Max.png'
+    maxSize: 0.6
+    gravity: 'south'
+  profile:
+    - 'xx-small':
+        maxsize: 225
+        quality: 60
+    - 'x-small':
+        maxsize: 324
+        quality: 60
+    - 'small':
+        maxsize: 480
+        quality: 60
+    - 'medium':
+        maxsize: 720
+        quality: 60
+    - 'large':
+        maxsize: 1080
+        quality: 70
+    - 'x-large':
+        maxsize: 1280
+        quality: 70
+    - 'xx-large':
+        maxsize: 1600
+        quality: 83
+index:
+  elasticsearch:
+   - host: 'localhost:9200'
+  index: 'myndasetur'
+  type: 'image'
