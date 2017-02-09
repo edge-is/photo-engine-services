@@ -1,2 +1,10 @@
 config.js
 node_modules/
+*.log
+config.yml
+.watermarkCache
+.vagrant
+archives
+fabs
+img
+thumbnails
