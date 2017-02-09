@@ -1,16 +1,18 @@
 
 var _utils = require('./lib/utils.js');
+var Workers = require('./lib/workers.js');
+
+var converter = require('./lib/converter.js');
 
 var configFile = __dirname + '/config.yml';
+
 var argv = require('yargs').argv;
 
 configFile = (typeof argv.c === 'string') ? argv.c : configFile;
 var config = _utils.readConfig(configFile);
 
 
-var Workers = require('./lib/workers.js');
 var rsmq =  _utils.rsmq(config);
-
 
 var workers = new Workers(config);
 

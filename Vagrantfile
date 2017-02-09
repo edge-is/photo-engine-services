@@ -70,5 +70,6 @@ Vagrant.configure(2) do |config|
     sudo yum install epel-release -y
     sudo yum install redis -y
     sudo systemctl start redis.service
+    sudo systemctl stop firewalld.service
   SHELL
 end
