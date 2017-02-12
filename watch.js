@@ -89,11 +89,11 @@ function supportedExtension(filename, cb){
   var name = path.parse(filename).name;
 
   if (name.charAt(0) === '.'){
-    return cb(`'${name}' is hidden and not a valid file for indexing`);
+    return cb(`'${filename}' is hidden and not a valid file for indexing`);
   }
 
   if (supportedExtensions.indexOf(ext) === -1){
-    return cb(`'${name}' is not an image and not supported`);
+    return cb(`'${filename}' is not an image and not supported`);
   }
 
   cb(null, true);
