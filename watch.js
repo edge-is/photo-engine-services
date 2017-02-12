@@ -55,19 +55,40 @@ function startComparing(qname, time){
       var name = path.parse(file.path).name;
       file.fileID = _utils.md5(file.path);
       var json = _utils.JSON.stringify(file);
-      // Create id for filename, make sure it does not exist before adding to queue
-      redisClient.get(file.fileID, function(err, reply) {
-          // reply is null when the key is missing
-          //
-          if (reply) return log.info(`${name} with ID:${file.fileID} already exists, skipping`);
 
-          if (err) return log.error('REDIS ERROR', err);
+      supportedExtension(file.path, function (err, supported){
 
-          rsmq.sendMessage({ qname : qname, message : json }, function (err, res){
-            log.info(`Added: ${name} with ID:${file.fileID} to queue`);
-            redisClient.set(file.fileID, new Date().getTime());
-          });
-      });
+        if (err) return log.info(`${name} is not supported for indexing`);
+        // Create id for filename, make sure it does not exist before adding to queue
+        redisClient.get(file.fileID, function(err, reply) {
+            // reply is null when the key is missing
+            //
+            if (reply) return log.info(`${name} with ID:${file.fileID} already exists, skipping`);
+
+            if (err) return log.error('REDIS ERROR', err);
+
+            rsmq.sendMessage({ qname : qname, message : json }, function (err, res){
+              log.info(`Added: ${name} with ID:${file.fileID} to queue`);
+              redisClient.set(file.fileID, new Date().getTime());
+            });
+        });
+      })
+
+
     });
   });
+}
+
+
+function supportedExtension(filename, cb){
+  var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
+
+  var ext = path.parse(filename).ext;
+
+
+  if (supportedExtensions.indexOf(ext) > -1){
+    return cb(null, true);
+  }
+  cb(`${ext} is not supported extension`, true);
+
 }

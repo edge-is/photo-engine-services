@@ -1,4 +1,3 @@
-
 /**
   1. Scale image
   2. thumbnail image
@@ -111,9 +110,12 @@ function startWorking(rsmq, qname){
         indexImage
       ],
       function (err, res){
-        if (err) return log.error(err, `not removing ${object.msg.fileID} from queue`);
 
-        log.debug('Got response from Elasticsearch', res);
+        var removeOnError = res;
+
+        if (err) log.error(err);
+        if (err && (removeOnError !== true)) return log.error(`not removing ${object.msg.fileID} from queue`);
+
         // Delete the fileID from the redis so it can be added laiter
         var indexResponse = res;
         redisClient.del(object.msg.fileID, function (err, res){
@@ -141,7 +143,7 @@ function sanityCheck(object, callback){
     },
     exists : function (obj, cb){
       fs.stat(obj.msg.path, function (err, res){
-        if (err) return cb(`"${filePath}" not found`);
+        if (err) return cb(`"${filePath}" not found`, true);
 
         cb(null, obj);
       });
@@ -152,18 +154,31 @@ function sanityCheck(object, callback){
       var filePath = obj.msg.path;
 
       if (fileName.charAt(0) === '.'){
-        return cb(`"${fileName}" is not a valid file for indexing`);
+        return cb(`"${fileName}" is not a valid file for indexing`, true);
       }
       cb(null, obj);
+    },
+    extensions : function (obj, cb){
+      var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
+
+      var ext = path.parse(obj.msg.path).ext;
+
+
+      if (supportedExtensions.indexOf(ext) > -1){
+        return cb(null, obj);
+      }
+      cb(`${ext} is not supported extension`, true);
+
     }
   };
 
   async.waterfall([
     async.apply(checks.filename, object),
     checks.exists,
-    checks.elasticsearch
+    checks.elasticsearch,
+    checks.extensions
   ],function (err, res){
-    if (err) return callback(err);
+    if (err) return callback(err, res);
 
     var fileName = path.parse(object.msg.path).name;
     log.debug(`File ${fileName} is OK for processing`);
@@ -224,7 +239,7 @@ function indexImage(object, callback){
     };
     if (err) return callback(err, basicInfo);
 
-    log.debug(`Finished indexing ${fileName}`);
+    log.debug(`Finished indexing ${fileName}`, basicInfo);
 
 
     object = null;
