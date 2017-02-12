@@ -55,8 +55,7 @@ function startComparing(qname, time){
       var name = path.parse(file.path).name;
       file.fileID = _utils.md5(file.path);
       var json = _utils.JSON.stringify(file);
-
-      supportedExtension(file.path, function (err, supported){
+      supportedFile(file, function (err, supported){
 
         if (err) return log.info(err);
         // Create id for filename, make sure it does not exist before adding to queue
@@ -80,21 +79,23 @@ function startComparing(qname, time){
 }
 
 
-function supportedExtension(filename, cb){
+
+function supportedFile(file, cb){
   var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
+  var ext = path.parse(file.path).ext;
 
-  var ext = path.parse(filename).ext;
-
-
-  var name = path.parse(filename).name;
+  var name = path.parse(file.path).name;
 
   if (name.charAt(0) === '.'){
-    return cb(`'${filename}' is hidden and not a valid file for indexing`);
+    return cb(`'${file.path}' is hidden and not a valid file for indexing`);
   }
 
   if (supportedExtensions.indexOf(ext) === -1){
-    return cb(`'${filename}' is not an image and not supported`);
+    return cb(`'${file.path}' is not an image and not supported`);
   }
+
+  // check the size of the file
+
 
   cb(null, true);
 

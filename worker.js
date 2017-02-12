@@ -90,6 +90,10 @@ function startWorking(rsmq, qname){
   log.debug('Starting worker queue nane is:', qname);
   log.debug('Waiting for message on queue:', qname);
 
+  worker.info( function (err, workerInfo){
+    log.debug('Worker info', qname, workerInfo);
+  })
+
   worker.on( "message", function( msg, next, id ){
     log.debug(`Got message, queue: ${qname} message id is ${id}`);
 
