@@ -58,7 +58,7 @@ function startComparing(qname, time){
 
       supportedExtension(file.path, function (err, supported){
 
-        if (err) return log.info(`${name} is not supported for indexing`);
+        if (err) return log.info(err);
         // Create id for filename, make sure it does not exist before adding to queue
         redisClient.get(file.fileID, function(err, reply) {
             // reply is null when the key is missing
@@ -72,7 +72,7 @@ function startComparing(qname, time){
               redisClient.set(file.fileID, new Date().getTime());
             });
         });
-      })
+      });
 
 
     });
@@ -86,9 +86,17 @@ function supportedExtension(filename, cb){
   var ext = path.parse(filename).ext;
 
 
-  if (supportedExtensions.indexOf(ext) > -1){
-    return cb(null, true);
+  var name = path.parse(filename).name;
+
+  if (name.charAt(0) === '.'){
+    return cb(`'${name}' is hidden and not a valid file for indexing`);
   }
-  cb(`${ext} is not supported extension`, true);
+
+  if (supportedExtensions.indexOf(ext) === -1){
+    return cb(`'${name}' is not an image and not supported`);
+  }
+
+  cb(null, true);
+
 
 }
