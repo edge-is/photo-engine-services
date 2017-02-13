@@ -43,6 +43,7 @@ var redisClient = redis.createClient({
 
 
 if (!argv.v){
+  console.log('Starting.. logging to file, -v for verbose');
   process.env.VIPS_WARNING=0;
 }
 
@@ -118,7 +119,7 @@ function startWorking(rsmq, qname){
         var removeOnError = res;
 
         if (err) log.error(err);
-        if (err && (removeOnError !== true)) return log.error(`not removing ${object.msg.fileID} from queue`);
+        if (err && (removeOnError !== true)) return log.error(`not removing ${object.msg.fileID} from queue, message id: ${id}`);
 
         // Delete the fileID from the redis so it can be added laiter
         var indexResponse = res;
@@ -139,20 +140,31 @@ function startWorking(rsmq, qname){
 function sanityCheck(object, callback){
   var checks = {
     elasticsearch : function (obj, cb){
-      elasticsearchClient.ping(function (err, res){
+      log.debug('Checking Elasticsearch');
+      elasticsearchClient.ping({
+        requestTimeout: 10000
+      },function (err, res){
         if (err) return cb('Elasticsearch error: '+ err);
+
+        log.debug('Elasticsearch OK');
 
         cb(null, obj);
       })
     },
     exists : function (obj, cb){
+
+      log.debug('Check if file exists...');
+
       fs.stat(obj.msg.path, function (err, res){
         if (err) return cb(`"${filePath}" not found`, true);
+        log.debug('File exists');
 
         cb(null, obj);
       });
     },
     filename : function (obj, cb){
+
+      log.debug('Checking if file is valid');
 
       var fileName = path.parse(obj.msg.path).name;
       var filePath = obj.msg.path;
@@ -160,15 +172,23 @@ function sanityCheck(object, callback){
       if (fileName.charAt(0) === '.'){
         return cb(`"${fileName}" is not a valid file for indexing`, true);
       }
+
+      log.debug('File is valid');
+
       cb(null, obj);
     },
     extensions : function (obj, cb){
+
+      log.debug('Checking if file has valid extension');
+
       var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
 
       var ext = path.parse(obj.msg.path).ext;
 
 
       if (supportedExtensions.indexOf(ext) > -1){
+        log.debug('File has valid extension');
+
         return cb(null, obj);
       }
       cb(`${ext} is not supported extension`, true);
@@ -231,7 +251,6 @@ function createThumbnail(object, callback){
 
 function indexImage(object, callback){
   var fileName = path.parse(object.msg.path).name;
-
   log.debug(`Starting indexing ${fileName}`);
 
   indexer.index(object.msg, function (err, res){

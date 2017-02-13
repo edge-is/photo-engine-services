@@ -34,6 +34,10 @@ redisClient.on("ready", function (info) {
     log.info('ready', config.redis.server);
 });
 
+if (!argv.v){
+  console.log('Starting.. logging to file, -v for verbose');
+}
+
 
 // Create logger
 
@@ -74,6 +78,9 @@ function startComparing(qname, time){
       });
 
 
+    });
+    compare.on('end', function (stats){
+      log.info(`Scan ended`);
     });
   });
 }
