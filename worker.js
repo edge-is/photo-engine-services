@@ -119,7 +119,10 @@ function startWorking(rsmq, qname){
         var removeOnError = res;
 
         if (err) log.error(err);
-        if (err && (removeOnError !== true)) return log.error(`not removing ${object.msg.fileID} from queue, message id: ${id}`);
+        if (err && (removeOnError !== true))  {
+          log.error(`not removing ${object.msg.fileID} from queue, message id: ${id} file: ${object.msg.path}`);
+          return next();
+        }
 
         // Delete the fileID from the redis so it can be added laiter
         var indexResponse = res;
