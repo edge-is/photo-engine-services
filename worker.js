@@ -100,7 +100,7 @@ function startWorking(rsmq, qname){
 
     worker.info( function (err, workerInfo){
       if (err) return callback(err);
-      log.debug('Worker info', workerInfo);
+      log.info(`Worker info, Messages: ${workerInfo.msgs}, Total sent: ${workerInfo.totalsent}, Total recived ${workerInfo.totalrecv}`);
       var object = {};
       object.msg= _utils.JSON.parse(msg);
       object.message_id = id;
@@ -133,6 +133,15 @@ function startWorking(rsmq, qname){
     });
   });
 
+  worker.on('exceeded', function( msg ){
+      log.error('exceeded: ', msg);
+  });
+
+  worker.on('timeout', function( msg ){
+      log.error('timeout: ', msg);
+  });
+
+
   worker.start();
 }
 
@@ -140,46 +149,47 @@ function startWorking(rsmq, qname){
 function sanityCheck(object, callback){
   var checks = {
     elasticsearch : function (obj, cb){
-      log.debug('Checking Elasticsearch');
+      log.debug('Checking Elasticsearch', config.elasticsearch);
       elasticsearchClient.ping({
         requestTimeout: 10000
       },function (err, res){
         if (err) return cb('Elasticsearch error: '+ err);
 
-        log.debug('Elasticsearch OK');
+        log.debug('Elasticsearch OK', config.elasticsearch);
 
         cb(null, obj);
       })
     },
     exists : function (obj, cb){
 
-      log.debug('Check if file exists...');
+      log.debug('Check if file exists', obj.msg.path);
 
       fs.stat(obj.msg.path, function (err, res){
         if (err) return cb(`"${filePath}" not found`, true);
-        log.debug('File exists');
+        log.debug('File exists', obj.msg.path);
 
         cb(null, obj);
       });
     },
     filename : function (obj, cb){
 
-      log.debug('Checking if file is valid');
 
       var fileName = path.parse(obj.msg.path).name;
       var filePath = obj.msg.path;
+      log.debug('Checking if file is valid', fileName);
 
       if (fileName.charAt(0) === '.'){
         return cb(`"${fileName}" is not a valid file for indexing`, true);
       }
 
-      log.debug('File is valid');
+      log.debug('File is valid', fileName);
 
       cb(null, obj);
     },
     extensions : function (obj, cb){
+      var fileName = path.parse(obj.msg.path).name;
 
-      log.debug('Checking if file has valid extension');
+      log.debug('Checking if file has valid extension', fileName);
 
       var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
 
@@ -187,7 +197,7 @@ function sanityCheck(object, callback){
 
 
       if (supportedExtensions.indexOf(ext) > -1){
-        log.debug('File has valid extension');
+        log.debug('File has valid extension', fileName);
 
         return cb(null, obj);
       }
@@ -218,7 +228,10 @@ function createSourceImage(object, callback){
   var fileName = path.parse(object.msg.path).name;
   log.debug(`Starting to create source image for ${fileName}`);
   converter.convert(object.msg, function (err, res){
-    if (err) return callback(err, object);
+    if (err){
+      object = null;
+      return callback(err, false);
+    }
 
     log.debug(`Finished creating source image for ${fileName} size: ${res.length}`);
 
@@ -241,7 +254,10 @@ function createThumbnail(object, callback){
   // now change path value to dst value so we use the new sourceImage
 
   thumbnails.create(object.msg, function (err, res){
-    if (err) return callback(err, object);
+    if (err){
+      object = null;
+      return callback(err, false);
+    }
 
     log.debug(`Finished creating thumbnails for ${fileName}`);
 
@@ -260,7 +276,10 @@ function indexImage(object, callback){
       fileName : path.parse(object.msg.path).name,
       elasticsearch : res
     };
-    if (err) return callback(err, basicInfo);
+    if (err)  {
+      object = null;
+      return callback(err, basicInfo);
+    }
 
     log.debug(`Finished indexing ${fileName}`, basicInfo);
 
