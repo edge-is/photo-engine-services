@@ -152,13 +152,13 @@ function startWorking(rsmq, qname){
 function sanityCheck(object, callback){
   var checks = {
     elasticsearch : function (obj, cb){
-      log.debug('Checking Elasticsearch', config.elasticsearch);
+      log.debug('Checking Elasticsearch', config.index.elasticsearch);
       elasticsearchClient.ping({
         requestTimeout: 10000
       },function (err, res){
         if (err) return cb('Elasticsearch error: '+ err);
 
-        log.debug('Elasticsearch OK', config.elasticsearch);
+        log.debug('Elasticsearch OK', config.index.elasticsearch);
 
         cb(null, obj);
       })
