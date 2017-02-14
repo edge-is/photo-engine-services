@@ -55,36 +55,43 @@ function startComparing(qname, time){
       extension : config.compare.extension
     }).start();
 
-    compare.on('file', function (file){
-      var name = path.parse(file.path).name;
-      file.fileID = _utils.md5(file.path);
-      var json = _utils.JSON.stringify(file);
-      supportedFile(file, function (err, supported){
-
-        if (err) return log.info(err);
-        // Create id for filename, make sure it does not exist before adding to queue
-        redisClient.get(file.fileID, function(err, reply) {
-            // reply is null when the key is missing
-            //
-            if (reply) return log.info(`${name} with ID:${file.fileID} already exists, skipping`);
-
-            if (err) return log.error('REDIS ERROR', err);
-
-            rsmq.sendMessage({ qname : qname, message : json }, function (err, res){
-              log.info(`Added: ${name} with ID:${file.fileID} to queue`);
-              redisClient.set(file.fileID, new Date().getTime());
-            });
-        });
-      });
-
-
-    });
+    compare.on('file', onFile);
     compare.on('end', function (stats){
       log.info(`Scan ended`);
+      setTimeout(function (){
+
+        // Delete compare aftier 1sek
+        compare = null;
+      }, 1000)
     });
   });
 }
 
+
+function onFile(file){
+  var name = path.parse(file.path).name;
+  file.fileID = _utils.md5(file.path);
+  var json = _utils.JSON.stringify(file);
+  supportedFile(file, function (err, supported){
+
+    if (err) return log.info(err);
+    // Create id for filename, make sure it does not exist before adding to queue
+    redisClient.get(file.fileID, function(err, reply) {
+        // reply is null when the key is missing
+        //
+        if (reply) return log.info(`${name} with ID:${file.fileID} already exists, skipping`);
+
+        if (err) return log.error('REDIS ERROR', err);
+
+        rsmq.sendMessage({ qname : qname, message : json }, function (err, res){
+          log.info(`Added: ${name} with ID:${file.fileID} to queue`);
+          redisClient.set(file.fileID, { status: "scanned", time : new Date().getTime()});
+        });
+    });
+  });
+
+
+}
 
 
 function supportedFile(file, cb){
@@ -101,8 +108,9 @@ function supportedFile(file, cb){
     return cb(`'${file.path}' is not an image and not supported`);
   }
 
-  // check the size of the file
-
+  //
+  // Delete variable for gc
+  file = null;
 
   cb(null, true);
 
