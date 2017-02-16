@@ -127,6 +127,11 @@ function startWorking(rsmq, qname){
           log.error(`not removing ${object.msg.fileID} from queue, message id: ${id} file: ${object.msg.path}`);
 
           var errMSG = _utils.JSON.stringify(err);
+
+          if (err instanceof Error){
+            errMSG = err.toString();
+          }
+
           return status.update(object.msg.fileID, { status: "error", time : new Date().getTime(), error: errMSG }, function (err, res){
             if (err) log.error('Error updating:' + object.msg.fileID, err);
 
@@ -148,10 +153,7 @@ function startWorking(rsmq, qname){
           return next();
         });
 
-        /*
-        redisClient.del(object.msg.fileID, function (err, res){
 
-        });*/
       });
     });
   });

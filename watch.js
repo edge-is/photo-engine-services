@@ -111,6 +111,10 @@ function dryFile(file){
 function onFile(file){
   var name = path.parse(file.path).name;
   file.fileID = _utils.md5(file.path);
+
+  file._scanAt = new Date().getTime();
+
+
   var json = _utils.JSON.stringify(file);
   supportedFile(file, function (err, supported){
 
