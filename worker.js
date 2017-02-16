@@ -129,7 +129,11 @@ function startWorking(rsmq, qname){
           var errMSG = _utils.JSON.stringify(err);
           return status.update(object.msg.fileID, { status: "error", time : new Date().getTime(), error: errMSG }, function (err, res){
             if (err) log.error('Error updating:' + object.msg.fileID, err);
-            return next();
+
+            setOldTimestamp(object.msg.dst, function (err){
+              object = null;
+              return next();
+            });
           });
 
         }
@@ -140,7 +144,8 @@ function startWorking(rsmq, qname){
         status.update(object.msg.fileID, { status: "finished", time : new Date().getTime() }, function (err, res){
           if (err) log.error('Error updating:' + object.msg.fileID, err);
           log.info(`Proceesed message id: ${id} and fileID: ${object.msg.fileID} filename: ${indexResponse.fileName}`);
-          next();
+          object = null;
+          return next();
         });
 
         /*
@@ -255,6 +260,8 @@ function createSourceImage(object, callback){
 
     object.msg._source_image_buffer = res;
 
+    object._dst = object.dst;
+
     status.update(object.msg.fileID, { status: "sourceimage", time_source : new Date().getTime() }, function (err, res){
       if (err) return callback(err);
       callback(null, object);
@@ -317,4 +324,13 @@ function indexImage(object, callback){
 
   });
 
+}
+
+
+function setOldTimestamp(image, callback ){
+  fs.stat(image, function (err, stat){
+    if (err) return callback(err);
+    // set 1.jan 2000
+    fs.utimes(image, 946684800, 946684800, callback);
+  })
 }
