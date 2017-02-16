@@ -6,6 +6,7 @@ var _utils = require('./lib/utils.js');
 var config = _utils.readConfig(__dirname + '/config.yml');
 
 var Compare = _utils.compare;
+var Status = require('./lib/status.js');
 
 
 var RedisSMQ = require("rsmq");
@@ -20,6 +21,17 @@ var redisClient = redis.createClient({
 var argv = require('yargs').argv;
 var logger = require('./lib/logger.js');
 var log = logger(config, 'watch', argv.v);
+
+
+if (argv.h){
+  return console.log(`
+    -v  verbose
+    -n  dry run
+    -h  help message
+    -c  <yaml file>
+    `)
+}
+
 
 redisClient.on("error", function (err) {
     log.error("Error " + err);
@@ -39,7 +51,15 @@ if (!argv.v){
 }
 
 
+
+var status = new Status(config.status, redisClient);
+
+
 // Create logger
+
+if (argv.n){
+  return startComparing(config.queue , '300h');
+}
 
 _utils.createQueue(rsmq, config.queue , function (err, qname) {
   if (err) return log.error(err);
@@ -55,7 +75,13 @@ function startComparing(qname, time){
       extension : config.compare.extension
     }).start();
 
-    compare.on('file', onFile);
+    var fn = onFile;
+
+    if (argv.n){
+      fn = dryFile
+    }
+
+    compare.on('file', fn);
     compare.on('end', function (stats){
       log.info(`Scan ended`);
       setTimeout(function (){
@@ -68,6 +94,20 @@ function startComparing(qname, time){
 }
 
 
+function dryFile(file){
+  var name = path.parse(file.path).name;
+  file.fileID = _utils.md5(file.path);
+  var json = _utils.JSON.stringify(file);
+  supportedFile(file, function (err, supported){
+    if (err) return log.error(err);
+    log.info({
+      file : file.path,
+      fileID : file.fileID
+    });
+
+  });
+}
+
 function onFile(file){
   var name = path.parse(file.path).name;
   file.fileID = _utils.md5(file.path);
@@ -76,17 +116,23 @@ function onFile(file){
 
     if (err) return log.info(err);
     // Create id for filename, make sure it does not exist before adding to queue
-    redisClient.get(file.fileID, function(err, reply) {
-        // reply is null when the key is missing
-        //
-        if (reply) return log.info(`${name} with ID:${file.fileID} already exists, skipping`);
+    status.get(file.fileID, function(err, reply) {
+      if (err) return log.error('REDIS ERROR', err);
 
-        if (err) return log.error('REDIS ERROR', err);
+      if (reply)  {
+        if (reply.status !== 'finished'){
+          // if not finished then skip it
+          return log.info(`${name} with ID:${file.fileID} already exists, skipping, current status is '${reply.status}'`);
+        }
+      }
 
-        rsmq.sendMessage({ qname : qname, message : json }, function (err, res){
-          log.info(`Added: ${name} with ID:${file.fileID} to queue`);
-          redisClient.set(file.fileID, { status: "scanned", time : new Date().getTime()});
-        });
+      rsmq.sendMessage({ qname : config.queue, message : json }, function (err, res){
+        if (err) return log.error(`Error adding to queue '${config.queue}'`);
+
+        log.info(`Added: ${name} with ID:${file.fileID} to queue`);
+
+        status.set(file.fileID, { scannedOn: process.env.HOSTNAME, queueID: res, status: "scanned", created : new Date().getTime()});
+      });
     });
   });
 

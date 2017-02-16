@@ -13,6 +13,8 @@ var RSMQWorker = require( "rsmq-worker" );
 var RedisSMQ = require("rsmq");
 var redis = require("redis");
 
+var Status = require('./lib/status.js');
+
 var elasticsearch = require('elasticsearch');
 
 var path = require('path');
@@ -57,6 +59,8 @@ var elasticsearchClient = new elasticsearch.Client({
     return log;
   }
 });
+
+var status = new Status(config.status, redisClient);
 
 var indexer = new Indexer(config.index, log);
 var thumbnails = new Thumbnails(config.thumbnails, log);
@@ -121,17 +125,28 @@ function startWorking(rsmq, qname){
         if (err) log.error(err);
         if (err && (removeOnError !== true))  {
           log.error(`not removing ${object.msg.fileID} from queue, message id: ${id} file: ${object.msg.path}`);
-          return next();
+
+          var errMSG = _utils.JSON.stringify(err);
+          return status.update(object.msg.fileID, { status: "error", time : new Date().getTime(), error: errMSG }, function (err, res){
+            if (err) log.error('Error updating:' + object.msg.fileID, err);
+            return next();
+          });
+
         }
 
         // Delete the fileID from the redis so it can be added laiter
         var indexResponse = res;
-        redisClient.del(object.msg.fileID, function (err, res){
-          if (err) log.error('Error deleting:' + object.msg.fileID, err);
-          var message = `Proceesed message id: ${id} and fileID: ${object.msg.fileID} filename: ${indexResponse.fileName}`;
-          log.info(message);
+
+        status.update(object.msg.fileID, { status: "finished", time : new Date().getTime() }, function (err, res){
+          if (err) log.error('Error updating:' + object.msg.fileID, err);
+          log.info(`Proceesed message id: ${id} and fileID: ${object.msg.fileID} filename: ${indexResponse.fileName}`);
           next();
         });
+
+        /*
+        redisClient.del(object.msg.fileID, function (err, res){
+
+        });*/
       });
     });
   });
@@ -240,7 +255,12 @@ function createSourceImage(object, callback){
 
     object.msg._source_image_buffer = res;
 
-    callback(null, object);
+    status.update(object.msg.fileID, { status: "sourceimage", time_source : new Date().getTime() }, function (err, res){
+      if (err) return callback(err);
+      callback(null, object);
+    });
+
+
   });
 }
 function createThumbnail(object, callback){
@@ -264,7 +284,10 @@ function createThumbnail(object, callback){
 
     log.debug(`Finished creating thumbnails for ${fileName}`);
 
-    callback(err, object);
+    status.update(object.msg.fileID, { status: "thumbnails",  time_thumbnail : new Date().getTime() }, function (err, res){
+      if (err) return callback(err);
+      callback(null, object);
+    });
   });
 }
 
@@ -286,9 +309,11 @@ function indexImage(object, callback){
 
     log.debug(`Finished indexing ${fileName}`, basicInfo);
 
-
-    object = null;
-    callback(err, basicInfo);
+    status.update(object.msg.fileID, { status: "indexed", time_index : new Date().getTime() }, function (err, res){
+      if (err) return callback(err);
+      object = null;
+      callback(null, basicInfo);
+    });
 
   });
 
