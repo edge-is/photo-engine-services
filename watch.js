@@ -135,7 +135,7 @@ function onFile(file){
 
         log.info(`Added: ${name} with ID:${file.fileID} to queue`);
 
-        status.set(file.fileID, { scannedOn: process.env.HOSTNAME, queueID: res, status: "scanned", created : new Date().getTime()});
+        status.set(file.fileID, { scannedOn: process.env.HOSTNAME, queueID: res, status: "scanned", created : new Date().getTime(), message : json });
       });
     });
   });
