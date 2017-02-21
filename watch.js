@@ -1,27 +1,26 @@
 
+var u = require('./lib/utils.js');
 
+var async = require('async');
+var argv = require('yargs').argv;
 
-var _utils = require('./lib/utils.js');
-
-var config = _utils.readConfig(__dirname + '/config.yml');
-
-var Compare = _utils.compare;
-var Status = require('./lib/status.js');
-
-
-var RedisSMQ = require("rsmq");
-var rsmq = _utils.rsmq(config);
+var logger = require('./lib/logger.js');
 
 var path = require('path');
-var redis = require("redis");
-var redisClient = redis.createClient({
-  host : config.redis.server,
-  port : config.redis.port
-});
-var argv = require('yargs').argv;
-var logger = require('./lib/logger.js');
-var log = logger(config, 'watch', argv.v);
 
+var configLoader = require('./lib/config-loader.js');
+
+var loader = configLoader('./config.yml');
+var RedisSMQ = require("rsmq");
+var Status = require('./lib/status.js');
+var redis = require('redis');
+
+
+var Compare = require('./lib/compare.js')
+
+if (!argv.v){
+  console.log('Starting.. logging to file, -v for verbose');
+}
 
 if (argv.h){
   return console.log(`
@@ -32,137 +31,59 @@ if (argv.h){
     `)
 }
 
-
-redisClient.on("error", function (err) {
-    log.error("Error " + err);
-});
+var skipStatus = argv.s || false;
 
 
-redisClient.on("connect", function (info) {
-    log.info('Connected', config.redis.server);
-});
-
-redisClient.on("ready", function (info) {
-    log.info('ready', config.redis.server);
-});
-
-if (!argv.v){
-  console.log('Starting.. logging to file, -v for verbose');
-}
+loader.on('ready', function (conf){
+  // Load all config stuff
+  var log = logger(conf, 'worker', argv.v);
+  //var pipeline = require('./lib/pipeline.js')(config,log);
 
 
-
-var status = new Status(config.status, redisClient);
-
-
-// Create logger
-
-if (argv.n){
-  return startComparing(config.queue , '300h');
-}
-
-_utils.createQueue(rsmq, config.queue , function (err, qname) {
-  if (err) return log.error(err);
-  log.info('Starting comparing images');
-  startComparing(qname, config.interval);
-});
-
-function startComparing(qname, time){
-  _utils.service(config.interval, function (){
-
-    log.info('Comparing:', config.compare.source, config.compare.destination);
-    var compare = new Compare(config.compare.source, config.compare.destination, {
-      extension : config.compare.extension
-    }).start();
-
-    var fn = onFile;
-
-    if (argv.n){
-      fn = dryFile
-    }
-
-    compare.on('file', fn);
-    compare.on('end', function (stats){
-      log.info(`Scan ended`);
-      setTimeout(function (){
-
-        // Delete compare aftier 1sek
-        compare = null;
-      }, 1000)
-    });
+  var redisClient = redis.createClient({
+    host : conf.redis.server,
+    port : conf.redis.port
   });
-}
 
+  var status = new Status(conf.status, redisClient);
 
-function dryFile(file){
-  var name = path.parse(file.path).name;
-  file.fileID = _utils.md5(file.path);
-  var json = _utils.JSON.stringify(file);
-  supportedFile(file, function (err, supported){
-    if (err) return log.error(err);
-    log.info({
-      file : file.path,
-      fileID : file.fileID
-    });
-
+  var rsmq = new RedisSMQ( {host: conf.redis.server , port: conf.redis.port , ns: conf.name || 'redismq' } );
+  redisClient.on("error", function (err) {
+      log.error("Error " + err);
   });
-}
 
-function onFile(file){
-  var name = path.parse(file.path).name;
-  file.fileID = _utils.md5(file.path);
+  redisClient.on("connect", function (info) {
+      log.info('Connected', conf.redis.server);
+  });
 
-  file._scanAt = new Date().getTime();
+  redisClient.on("ready", function (info) {
+      log.info('ready', conf.redis.server);
+      start(conf);
+  });
+  var service = false;
 
+  function start(conf){
+    var compare = new Compare({
+      rsmq : rsmq,
+      status : status,
+      log : log
+    });
+    u.createQueue(rsmq, conf.queue, function (err, res){
 
-  var json = _utils.JSON.stringify(file);
-  supportedFile(file, function (err, supported){
+      service = u.service(conf.interval, function (){
+        async.forEachLimit(conf.servers, 1, function (server, next){
+          var namespace = Object.keys(server).pop();
+          var serverConfig = server[namespace];
+          log.info(`Starting service on interval ${conf.interval} for ${serverConfig.source.folder}`);
+          compare.start(conf, namespace, next);
 
-    if (err) return log.info(err);
-    // Create id for filename, make sure it does not exist before adding to queue
-    status.get(file.fileID, function(err, reply) {
-      if (err) return log.error('REDIS ERROR', err);
-
-      if (reply)  {
-        if (reply.status !== 'finished'){
-          // if not finished then skip it
-          return log.info(`${name} with ID:${file.fileID} already exists, skipping, current status is '${reply.status}'`);
-        }
-      }
-
-      rsmq.sendMessage({ qname : config.queue, message : json }, function (err, res){
-        if (err) return log.error(`Error adding to queue '${config.queue}'`);
-
-        log.info(`Added: ${name} with ID:${file.fileID} to queue`);
-
-        status.set(file.fileID, { scannedOn: process.env.HOSTNAME, queueID: res, status: "scanned", created : new Date().getTime(), message : json });
+        });
       });
     });
-  });
-
-
-}
-
-
-function supportedFile(file, cb){
-  var supportedExtensions = ['.tiff','.tif', '.jpg', '.jpeg', '.png'];
-  var ext = path.parse(file.path).ext;
-
-  var name = path.parse(file.path).name;
-
-  if (name.charAt(0) === '.'){
-    return cb(`'${file.path}' is hidden and not a valid file for indexing`);
   }
 
-  if (supportedExtensions.indexOf(ext) === -1){
-    return cb(`'${file.path}' is not an image and not supported`);
-  }
+});
 
-  //
-  // Delete variable for gc
-  file = null;
-
-  cb(null, true);
-
-
-}
+loader.on('error', function (error){
+  console.log(error);
+});
