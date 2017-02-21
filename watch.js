@@ -74,6 +74,9 @@ loader.on('ready', function (conf){
         async.forEachLimit(conf.servers, 1, function (server, next){
           var namespace = Object.keys(server).pop();
           var serverConfig = server[namespace];
+
+          if (serverConfig.disabled) return next();
+
           log.info(`Starting service on interval ${conf.interval} for ${serverConfig.source.folder}`);
           compare.start(conf, namespace, next);
 
