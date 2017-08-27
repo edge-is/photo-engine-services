@@ -69,7 +69,11 @@ Vagrant.configure(2) do |config|
     sudo echo "nameserver 8.8.8.8" > /etc/resolv.conf
     sudo yum install epel-release -y
     sudo yum install redis -y
-    sudo systemctl start redis.service
     sudo systemctl stop firewalld.service
+    sudo sed -i 's/^bind 127.0.0.1.*/bind 0.0.0.0/' /etc/redis.conf
+    sudo systemctl start redis.service
+    sudo systemctl status redis.service
+    cat /etc/redis.conf | grep -v "#"
+
   SHELL
 end

@@ -13,8 +13,10 @@
   "license": "GPL-3.0",
   "dependencies": {
     "async": "^2.0.1",
+    "bull": "^3.0.0-rc.2",
     "bunyan": "^1.8.5",
     "elasticsearch": "^11.0.1",
+    "find.js": "^1.0.4",
     "js-yaml": "^3.6.1",
     "mkdirp": "^0.5.1",
     "node-yaml-config": "0.0.4",
@@ -22,8 +24,6 @@
     "redis": "^2.6.5",
     "restify": "^4.3.0",
     "restify-errors": "^4.3.0",
-    "rsmq": "^0.7.1",
-    "rsmq-worker": "^0.5.1",
     "sharp": "^0.16.2",
     "slug": "^0.9.1",
     "socket.io": "^1.7.2",
@@ -31,5 +31,8 @@
     "walk": "^2.3.9",
     "xml2js": "^0.4.17",
     "yargs": "^5.0.0"
+  },
+  "devDependencies": {
+    "bull-arena": "^1.3.1"
   }
 }
