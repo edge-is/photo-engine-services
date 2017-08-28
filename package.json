@@ -15,6 +15,7 @@
     "async": "^2.0.1",
     "bull": "^3.0.0-rc.2",
     "bunyan": "^1.8.5",
+    "bunyan-rotating-file-stream": "^1.6.3",
     "elasticsearch": "^11.0.1",
     "find.js": "^1.0.4",
     "js-yaml": "^3.6.1",
