@@ -17,7 +17,7 @@
     "bunyan": "^1.8.5",
     "bunyan-rotating-file-stream": "^1.6.3",
     "elasticsearch": "^11.0.1",
-    "find.js": "^1.0.4",
+    "find.js": "^1.0.5",
     "js-yaml": "^3.6.1",
     "mkdirp": "^0.5.1",
     "node-yaml-config": "0.0.4",
