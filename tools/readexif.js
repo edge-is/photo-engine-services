@@ -9,6 +9,7 @@ const XMP = require('../lib/xmp.js');
 const file = argv._.pop();
 
 
+const list = argv.list || false;
 
 var xmp = new XMP();
 
@@ -25,7 +26,7 @@ if (process.stdin.isTTY === undefined){
     string +=chunk;
   });
 
-  process.stdin.on('end', function() {
+  return process.stdin.on('end', function() {
     let array = string.split('\r\n');
 
     array = array.filter(function (item){
@@ -34,7 +35,7 @@ if (process.stdin.isTTY === undefined){
 
     async.forEachLimit(array, 1, function (file, next){
       xmp.read(file).then(function (metadata){
-        processMetadata(metadata, next);
+        return processMetadata(metadata, next);
       }).catch(function (err){
         if (err.code === 'ENOENT'){
 
@@ -47,8 +48,29 @@ if (process.stdin.isTTY === undefined){
     })
 
   });
+}else if(list){
+  console.log(`Reading ${list}`);
+  var array = fs.readFileSync(list).toString('utf-8').split('\r\n');
+  array = array.filter(function (item){
+    return (item.length > 1);
+  });
+
+  return async.forEachLimit(array, 1, function (file, next){
+    xmp.read(file).then(function (metadata){
+      return processMetadata(metadata, next);
+    }).catch(function (err){
+      if (err.code === 'ENOENT') {
+        console.error(`'${file} does not exist'`);
+        return next();
+      }
+
+      console.error(err);
+    });
+  }, function done(){
+    console.log(`All files done`);
+  })
 }else{
-  xmp.read(file).then(processMetadata).catch(function (err){
+  return xmp.read(file).then(processMetadata).catch(function (err){
     if (err.code === 'ENOENT') return console.error(`'${file} does not exist'`);
 
     console.error(err);
