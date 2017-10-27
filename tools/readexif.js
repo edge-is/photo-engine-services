@@ -49,9 +49,7 @@ if (process.stdin.isTTY === undefined){
 
   });
 }else if(list){
-  console.log(`Reading ${list}`);
   var array = fs.readFileSync(list).toString('utf-8').split('\n');
-
   array = array.map(function (item){
     return item.replace(/\r/g, '');
   });
