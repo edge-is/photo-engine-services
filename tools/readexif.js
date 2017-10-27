@@ -50,7 +50,12 @@ if (process.stdin.isTTY === undefined){
   });
 }else if(list){
   console.log(`Reading ${list}`);
-  var array = fs.readFileSync(list).toString('utf-8').split('\r\n');
+  var array = fs.readFileSync(list).toString('utf-8').split('\n');
+
+  array = array.map(function (item){
+    return item.replace(/\r/g, '');
+  });
+
   array = array.filter(function (item){
     return (item.length > 1);
   });
