@@ -14,8 +14,8 @@ const list = argv.list || false;
 var xmp = new XMP();
 
 
+if (process.stdin.isTTY === undefined && process.env._ !== "/usr/bin/nodemon"){
 
-if (process.stdin.isTTY === undefined){
   // Pipe is on ..
   //
   //process.stdin.resume();
@@ -153,7 +153,7 @@ function prettyPrint(metadata, i, len){
     let value = metadata[key];
 
     let padd = getPadding(total - key.length);
-
+    
 
 
     console.log(`${padd} ${key} : ${value}`);
